@@ -253,4 +253,8 @@ if __name__=="__main__":
     parser.add_argument("brickname", type=str, help="Brick name")
     parser.add_argument("band", type=str, help="Band")
     args = parser.parse_args()
+<<<<<<< HEAD
     main(args.brickname, args.band)
+=======
+    main(args.brickname, args.band)
+>>>>>>> 9f9499a8bb0260eb1473d06677ccb5a8c876136b
