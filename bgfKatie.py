@@ -254,10 +254,3 @@ if __name__=="__main__":
     parser.add_argument("band", type=str, help="Band")
     args = parser.parse_args()
     main(args.brickname, args.band)
-    
-    
-git clone https://github.com/mlandriau/bgf.git
-cd bgf
-git checkout -b Katie
-git commit -am "Commit message."
-git push origin Katie
