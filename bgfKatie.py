@@ -1,5 +1,3 @@
-from __future__ import print_function
-from __future__ import division
 from astropy.io import fits
 from astropy import wcs
 import matplotlib.pyplot as plt
@@ -8,13 +6,9 @@ import scipy
 import scipy.ndimage as ndimage
 import scipy.ndimage.filters as filters
 import sys
-from numpy import rec
 import os
-import pdb
 from astropy.modeling.models import Sersic2D
 from scipy.optimize import least_squares
-from astropy.io import ascii
-from mpl_toolkits.mplot3d import axes3d
 from urllib.request import urlopen
 
 class sersic_fit:
@@ -59,7 +53,7 @@ class sersic_fit:
 		e = params[1]
 		t = params[2]
 		amp = params[3]
-		model = Sersic2D(r_eff = r, n=2, x_0=self.x1-self.xs, y_0=self.y1-self.ye, ellip=e, theta=t, amplitude=amp)
+		model = Sersic2D(r_eff = r, n=1, x_0=self.x1-self.xs, y_0=self.y1-self.ye, ellip=e, theta=t, amplitude=amp)
 		img = model(self.x,self.y)
 		resid = np.sqrt(self.invar)*(self.image-img)
 		return img, resid
@@ -248,6 +242,7 @@ def main(brickname, band):
 	amp = .09
 	centers = [(y2[0],x2[0])]
 	params = (r, e, t, amp)
+	
 	brick = sersic_fit(brickname, band, centers, subimage=(xs, ys, xe, ye))
 	p = brick.best_fit(brickname, band, params, centers)
 	img, resid = brick.get_model(p)
@@ -259,4 +254,8 @@ if __name__=="__main__":
     parser.add_argument("brickname", type=str, help="Brick name")
     parser.add_argument("band", type=str, help="Band")
     args = parser.parse_args()
+<<<<<<< HEAD
     main(args.brickname, args.band)
+=======
+    main(args.brickname, args.band)
+>>>>>>> 9f9499a8bb0260eb1473d06677ccb5a8c876136b
