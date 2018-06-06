@@ -19,7 +19,7 @@ from urllib.request import urlopen
 
 class sersic_fit:
 
-	def __init__(self, brickname, band, centers=None, subimage=None, srcdir=None):
+	def __init__(self, brickname, band, centers, subimage=None, srcdir=None):
 		if srcdir==None:
 			srcdir= "./"+brickname
 		self.brickname = brickname
@@ -30,29 +30,24 @@ class sersic_fit:
 		invar0 = fits.getdata(invarname)
 		chiname = os.path.join(srcdir, 'legacysurvey-%s-chi2-%s.fits.fz' % (brickname, band))
 		chi20 = fits.getdata(chiname)
-		xs, ys, xe, ye = subimage
-		xs = int(xs)
-		ys = int(ys)
-		xe = int(xe)
-		ye = int(ye)
-		self.image = image0[ye:ys,xs:xe]
-		self.invar = invar0[ye:ys,xs:xe]
-		self.chi2_tractor = chi20[ye:ys,xs:xe]
-		# plt.imshow(self.image, vmin=-.001, vmax=1, cmap="pink")
-# 		plt.title("Image")
-# 		plt.show()
-# 		plt.imshow(self.invar, vmin=-.001, vmax=1, cmap="pink")
-# 		plt.title("Invar")
-# 		plt.show()
-# 		plt.imshow(self.chi2_tractor, vmin=-.001, vmax=1, cmap="pink")
-# 		plt.title("Chi2 Tractor")
-# 		plt.show()
-		self.xs = xs
-		self.ys = ys
-		self.xe = xe
-		self.ye = ye
-		x1 = centers[0]
-		y1 = centers[1]
+		x1, y1 = centers[0]
+		if subimage==None:
+			self.image = image0
+			self.invar = invar0
+			self.chi2_tractor = chi20
+			self.xs = 0
+			self.ys = 0
+			self.xe = 0
+			self.ye = 0
+		else:
+			xs, ys, xe, ye = subimage
+			self.image = image0[xs:xe,ys:ye]
+			self.invar = invar0[xs:xe,ys:ye]
+			self.chi2_tractor = chi20[xs:xe,ys:ye]
+			self.xs = xs
+			self.ys = ys
+			self.xe = xe
+			self.ye = ye
 		self.invar[self.invar<0.0] = 0.0
 		self.n1, self.n2 = self.image.shape
 		self.x, self.y = np.meshgrid(np.arange(self.n1), np.arange(self.n2), indexing='ij') # Vertical / horizontal axes convention?
@@ -64,27 +59,27 @@ class sersic_fit:
 		e = params[1]
 		t = params[2]
 		amp = params[3]
-		model = Sersic2D(r_eff = r, n=4, x_0=self.x1-self.xs, y_0=self.y1-self.ye, ellip=e, theta=t, amplitude=amp)
+		model = Sersic2D(r_eff = r, n=2, x_0=self.x1-self.xs, y_0=self.y1-self.ye, ellip=e, theta=t, amplitude=amp)
 		img = model(self.x,self.y)
 		resid = np.sqrt(self.invar)*(self.image-img)
 		return img, resid
 
 	def plot_model_1d_row(self, img, chi2, row=None):
 		if row==None:
-			row = int(self.y1)
+			row = int(self.x1)
 		fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
 		ax1.set_title("Brick " + self.brickname + " " + self.band + "-band image, row " +str(row))
 		ii = np.where(self.invar>0.0)
 		error = np.zeros((self.n1, self.n2))
 		error[ii] = 1.0/np.sqrt(self.invar[ii])
-		xaxis = np.arange(self.xs, self.xs+self.n1)
-		row = row - self.ye
-		line_data = ax1.semilogy(xaxis, self.image[0:self.n1, row], label='Data', lw=1)
-		line_model = ax1.semilogy(xaxis, img[0:self.n1, row], label='Model', lw=1)
+		xaxis = np.arange(self.ys, self.ys+self.n2)
+		row = row - self.xs
+		line_data = ax1.semilogy(xaxis, self.image[row, 0:self.n2], label='Data', lw=1)
+		line_model = ax1.semilogy(xaxis, img[row, 0:self.n2], label='Model', lw=1)
 		ax1.set_ylabel('Flux')
 		ax1.legend(handles=[line_data[0], line_model[0]])
-		line_chi2 = ax2.semilogy(xaxis, chi2[0:self.n1, row], label='$\chi^2$, this code', lw=1)
-		line_chi2tractor = ax2.semilogy(xaxis, self.chi2_tractor[0:self.n1, row], label='$\chi^2$, tractor', lw=1)
+		line_chi2 = ax2.semilogy(xaxis, chi2[row, 0:self.n2], label='$\chi^2$, this code', lw=1)
+		line_chi2tractor = ax2.semilogy(xaxis, self.chi2_tractor[row, 0:self.n2], label='$\chi^2$, tractor', lw=1)
 		ax2.set_ylabel('$\chi^2$')
 		ax2.legend(handles=[line_chi2tractor[0], line_chi2[0]])
 		plt.show()
@@ -99,8 +94,7 @@ class sersic_fit:
 	def best_fit(self, brickname, band, params, centers, srcdir=None):
 		self.brickname = brickname 
 		self.band = band
-		x1 = centers[0]
-		y1 = centers[1]
+		x1, y1 = centers[0]
 		if srcdir==None:
 			srcdir= "./"+brickname
 		p = np.asarray(params)
@@ -113,6 +107,7 @@ class sersic_fit:
 		errors = np.sqrt(np.diag(cov))
 		popt = np.asarray(popt)
 		image = os.path.join(srcdir, 'legacysurvey-%s-image-%s.fits.fz' % (brickname, band))
+		
 		data, header = fits.getdata(image, header=True)
 		fits.getheader(image, 0)
 		twcs = wcs.WCS(header)
@@ -133,12 +128,12 @@ class sersic_fit:
 				if line[0] != '#':
 					galchar = line[:-1].split()
 					first = galchar[0]
-					if first[0] in {'N', 'U', 'I', 'P'}:
+					if first[0] in {'N', 'U', 'I', 'P', 'S'}:
 						galaxies.append(galchar[0])
 				else:
 					pass    
-		galaxyname = galaxies[0]
-		a1 = np.array(galaxyname)
+		a1 = np.array(galaxies[0])
+		print(a1)
 		a2 = np.array([ra])
 		a3 = np.array([dec])
 		a4 = np.array([popt[0]])
@@ -190,7 +185,7 @@ class sersic_fit:
 def main(brickname, band):
 	srcdir = brickname
 	imagename = os.path.join(srcdir, 'legacysurvey-%s-image-%s.fits.fz' % (brickname, band))
-	im0 = fits.getdata(imagename)
+	image = fits.getdata(imagename)
 	model = os.path.join(srcdir, 'all-models-%s.fits' % (brickname))
 	hdu = fits.open(model)
 	data = hdu[1].data
@@ -205,34 +200,44 @@ def main(brickname, band):
 	neighborhood_size = 1000
 	threshold = 1
 
-	im0_max = filters.maximum_filter(im0, neighborhood_size)
-	maxima = (im0 == im0_max)
-	im0_min = filters.minimum_filter(im0, neighborhood_size)
-	diff = ((im0_max - im0_min) > threshold)
-	maxima[diff == 0] = 0
-	labeled, num_objects = ndimage.label(maxima)
-	xy = np.array(ndimage.center_of_mass(im0, labeled, range(1, num_objects+1)))
-
 	data, header = fits.getdata(imagename, header=True)
 	twcs = wcs.WCS(header)
-	xs, ys = twcs.wcs_world2pix(raLeft, decUp, 0)
-	xe, ye = twcs.wcs_world2pix(raRight, decDown, 0)
+	ys, xe = twcs.wcs_world2pix(raLeft, decUp, 0)
+	ye, xs = twcs.wcs_world2pix(raRight, decDown, 0)
 
-	centers = []
-	i = 0
-	for i in range(0, len(xy[:, 0])):
-		if xy[i, 1] > xs and xy[i, 1] < xe:
-			if xy[i, 0] < ys and xy[i, 0] > ye:
-				centers.append(xy[i, 1])
-				centers.append(xy[i, 0])
-		i = i + 1
-	xCenter = centers[0]
-	yCenter = centers[1]
-	plt.imshow(im0, cmap="pink", vmin =-.001, vmax=.5)
-	plt.title("Subimage %s, band %s" % (brickname, band))
-	plt.plot(xCenter, yCenter, 'bo')
-	plt.colorbar()
-	#plt.show()
+	xs = int(xs)
+	ys = int(ys)
+	xe = int(xe)
+	ye = int(ye)
+	subimage = image[xs:xe,ys:ye]
+
+	data_max = filters.maximum_filter(subimage, neighbourhood_size)
+	maxima = (subimage == data_max)
+	data_min = filters.minimum_filter(subimage, neighbourhood_size)
+	diff = ((data_max - data_min) > threshold)
+	maxima[diff == 0] = 0
+
+	labeled, num_objects = ndimage.label(maxima)
+	slices = ndimage.find_objects(labeled)
+	x, y = [], []
+	for dy,dx in slices:
+		x_cent = (dx.start + dx.stop - 1)/2
+		x.append(x_cent+ys)
+		y_cent = (dy.start + dy.stop - 1)/2
+		y.append(y_cent+xs)
+	
+	x2, y2 = [], []
+	for i in range(len(x)):
+		if x[i] > ys and x[i] < ye:
+			if y[i] < xe and y[i] > xs:
+				x2.append(x[i])
+				y2.append(y[i])
+
+	plt.imshow(image, cmap="pink", vmin=-.001, vmax=1)
+	plt.plot(x2, y2, 'ro')
+	plt.title("Brick %s, band %s" % (brickname, band))
+	plt.plot(x2[0], y2[0], 'bo')
+	plt.show()
 
 	a = 200
 	b = 100
@@ -241,6 +246,7 @@ def main(brickname, band):
 	r = 135
 	e = .5
 	amp = .09
+	centers = [(y2[0],x2[0])]
 	params = (r, e, t, amp)
 	brick = sersic_fit(brickname, band, centers, subimage=(xs, ys, xe, ye))
 	p = brick.best_fit(brickname, band, params, centers)
